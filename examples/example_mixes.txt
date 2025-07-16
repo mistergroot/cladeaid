@@ -1,0 +1,17 @@
+Mix	Run	Constituent	Proportion	Bases	Notes
+MixA	ERR11752369	Klebsiella pneumoniae 11227-1		1000000	Balanced
+MixA	ERR4662002	Escherichia fergusonii ATCC 35469		1000000	Balanced
+MixA	DRR217208	Escherichia coli str. K-12 substr. MG1655		1000000	Balanced
+MixA	SRR530851	Escherichia coli O157:H7 str. Sakai		1000000	Balanced
+MixB	ERR11752369	Klebsiella pneumoniae 11227-1		3000000	"Unbalanced, variable Escherichia"
+MixB	ERR4662002	Escherichia fergusonii ATCC 35469		100000	"Unbalanced, variable Escherichia"
+MixB	DRR217208	Escherichia coli str. K-12 substr. MG1655		600000	"Unbalanced, variable Escherichia"
+MixB	SRR530851	Escherichia coli O157:H7 str. Sakai		300000	"Unbalanced, variable Escherichia"
+MixC	ERR11752369	Klebsiella pneumoniae 11227-1		3100000	"Unbalanced, even Escherichia"
+MixC	ERR4662002	Escherichia fergusonii ATCC 35469		300000	"Unbalanced, even Escherichia"
+MixC	DRR217208	Escherichia coli str. K-12 substr. MG1655		300000	"Unbalanced, even Escherichia"
+MixC	SRR530851	Escherichia coli O157:H7 str. Sakai		300000	"Unbalanced, even Escherichia"
+MixC	ERR11752369	Klebsiella pneumoniae 11227-1		500000	"Unbalanced, all uneven"
+MixC	ERR4662002	Escherichia fergusonii ATCC 35469		1500000	"Unbalanced, all uneven"
+MixC	DRR217208	Escherichia coli str. K-12 substr. MG1655		300000	"Unbalanced, all uneven"
+MixC	SRR530851	Escherichia coli O157:H7 str. Sakai		1700000	"Unbalanced, all uneven"
