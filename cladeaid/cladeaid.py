@@ -1,39 +1,17 @@
+from html import parser
 import pysam
 from collections import defaultdict
+import pandas as pd
 import time
 from tqdm import tqdm
 import gzip
 import argparse
 import csv
-
-def smart_open(filepath):
-    return gzip.open(filepath, 'rt') if filepath.endswith('.gz') else open(filepath, 'r')
-
-# --- Step 1: Parse taxonomy files ---
-def parse_nodes_dmp(path):
-    parent = {}
-    rank = {}
-    with smart_open(path) as f:
-        for line in f:
-            fields = [x.strip() for x in line.split("|")]
-            taxid = int(fields[0])
-            parent_id = int(fields[1])
-            tax_rank = fields[2]
-            parent[taxid] = parent_id
-            rank[taxid] = tax_rank
-    return parent, rank
-
-def parse_names_dmp(path):
-    name_map = {}
-    with smart_open(path) as f:
-        for line in f:
-            fields = [x.strip() for x in line.split("|")]
-            taxid = int(fields[0])
-            name_txt = fields[1]
-            class_txt = fields[3]
-            if class_txt == "scientific name":
-                name_map[taxid] = name_txt
-    return name_map
+import tax_parsing
+from tax_parsing import parse_nodes_dmp
+from tax_parsing import parse_names_dmp
+from tax_parsing import smart_open
+import propagate_counts
 
 def parse_accession2taxid(acc2taxid_file, bamfile):
     print("🔎 Scanning BAM for reference names...")
@@ -195,6 +173,8 @@ def process_bam_streaming(bamfile, acc2taxid_file, nodes_file, names_file,
 
 # (rest of code above unchanged)
 
+# (rest of code above unchanged)
+
 def assign_lca_from_pair(reads, refid_to_taxid, parent, rank, names, min_identity=0.0, extract_read_attributes=False):
     from collections import defaultdict
 
@@ -255,19 +235,20 @@ def assign_lca_from_pair(reads, refid_to_taxid, parent, rank, names, min_identit
             nm = read.get_tag("NM") if read.has_tag("NM") else 0
             insertions = sum(length for op, length in (read.cigartuples or []) if op == 1)
             deletions = sum(length for op, length in (read.cigartuples or []) if op == 2)
-            mismatches = max(0, nm - insertions - deletions)  # mismatches = NM - I - D
+            mismatches = max(0, nm - insertions - deletions)
 
             metrics = {
-            "length": read.query_length or 0,
-            "mismatches": mismatches,
-            "insertions": insertions,
-            "deletions": deletions,
-            "softclips": sum(length for op, length in (read.cigartuples or []) if op == 4),
-            "hardclips": sum(length for op, length in (read.cigartuples or []) if op == 5),
-            "avg_qual": round(sum(read.query_qualities or []) / len(read.query_qualities or [1]), 2)
+                "length": read.query_length or 0,
+                "mismatches": mismatches,
+                "insertions": insertions,
+                "deletions": deletions,
+                "softclips": sum(length for op, length in (read.cigartuples or []) if op == 4),
+                "hardclips": sum(length for op, length in (read.cigartuples or []) if op == 5),
+                "avg_qual": round(sum(read.query_qualities or []) / len(read.query_qualities or [1]), 2)
             }
 
-            read_metrics[key] = metrics
+            # For unpaired reads, store in R1 metrics
+            read_metrics["R1" if key in ("R1", "U") else "R2"] = metrics
 
     taxid_r1 = collapsed_taxids.get("R1")
     taxid_r2 = collapsed_taxids.get("R2")
@@ -307,7 +288,6 @@ def assign_lca_from_pair(reads, refid_to_taxid, parent, rank, names, min_identit
 
     return row
 
-
 # Updated assignment logic is assumed to already include the optional read attribute extraction
 
 # --- Step 5: CLI ---
@@ -318,15 +298,29 @@ def main():
     parser.add_argument("--acc2taxid", required=True, help="Accession2taxid mapping file (.tsv or .gz)")
     parser.add_argument("--nodes", required=True, help="nodes.dmp taxonomy file (can be .gz)")
     parser.add_argument("--names", required=True, help="names.dmp taxonomy file (can be .gz)")
-    parser.add_argument("--output", required=True, help="Output CSV file")
-
-    parser.add_argument("--min_identity", type=float, default=0.0, help="Minimum identity threshold (default: 0.0)")
-    parser.add_argument("--max_reads", type=int, help="Optional maximum number of reads to process")
-    parser.add_argument("--write_discordant_bam", action="store_true", help="Write BAM of discordant reads")
-    parser.add_argument("--discordant_bam_path", default="discordant.bam", help="Path to write discordant BAM")
-    parser.add_argument("--write_specificity_bam", action="store_true", help="Write BAM of specificity-overridden reads")
-    parser.add_argument("--specificity_bam_path", default="specificity.bam", help="Path to write specificity BAM")
-    parser.add_argument("--extract_read_attributes", action="store_true", help="Extract and output read length, CIGAR, and quality metrics")
+    parser.add_argument("--output", required=True, help="Output prefix - Assigned reads will be output as <output>.csv, and, "
+    "if --estimate_abundance is used, abundances will be written to <output>.abundances")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
+    parser.add_argument("--min_identity", type=float, default=0.0, help="Optional - Minimum identity threshold (default: 0.0)")
+    parser.add_argument("--max_reads", type=int, help="Optional - maximum number of reads to process")
+    parser.add_argument("--write_discordant_bam", action="store_true", help="Optional - Write BAM of discordant reads")
+    parser.add_argument("--discordant_bam_path", default="discordant.bam", help="Optional - Path to write discordant BAM")
+    parser.add_argument("--write_specificity_bam", action="store_true", help="Optional - Write BAM of specificity-overridden reads")
+    parser.add_argument("--specificity_bam_path", default="specificity.bam", help="Optional - Path to write specificity BAM")
+    parser.add_argument("--extract_read_attributes", action="store_true", help="Optional - Extract and output read length, " \
+    "CIGAR, and quality metrics")
+    parser.add_argument("--estimate_abundance", action="store_true", help="Optional - Estimate abundance by proportionally " \
+    "propagating bases from ambiguous taxonomic levels to more specific taxonomic levels. This will output a file "
+    "<output>.abundances with taxon names and assigned bases. By default, this done naively. If there are 3 species in a genus, " \
+    "the reads will be allocated proportional to their species-level base abundances, regardless of their phylogenetic distance. " \
+    "For phylogenetically-informed scaling, use --mash_reallocation")
+    parser.add_argument("--genome_size_scaling", action="store_true", help="Optional - Adjust base abundances based on " \
+    "reference genome lengths")
+    parser.add_argument("--mash_reallocation", action="store_true", help="Optional - Use mash to calculate distances and " \
+    "reallocate bases to more specific taxa, taking into account that more distant taxa are less likely to be misassigned")
+    parser.add_argument("--reference_genome_list", action="store_true", help="Optional - Path to a list of reference genomes " \
+    "to use for mash reallocation and adjusting base abundances based on reference genome lengths. Required if "
+    "--genome_size_scaling and/or --mash_reallocation is used")
 
     args = parser.parse_args()
 
@@ -345,7 +339,7 @@ def main():
         extract_read_attributes=args.extract_read_attributes
     )
 
-    with open(args.output, "w", newline="") as f:
+    with open(args.output + ".csv", "w", newline="") as f:
         writer = csv.writer(f)
         if args.extract_read_attributes:
             writer.writerow([
@@ -358,6 +352,24 @@ def main():
                 "ReadName", "TaxID", "TaxName", "Rank", "TotalBases", "BestIdentity", "ReadPairConcordance"
             ])
         writer.writerows(results)
+
+    if args.estimate_abundance:
+        assignments = pd.read_csv(args.output + ".csv")
+        assignments['Bases'] = assignments.groupby(['TaxID', 'TaxName'])['TotalBases'].transform('sum')
+        assignments = assignments.drop_duplicates(subset=['TaxID', 'TaxName']).reset_index(drop=True)
+        observed_read_counts=dict(zip(assignments["TaxID"], assignments["Bases"]))
+        taxid_list = assignments["TaxID"].tolist()
+        abundances, parenttochildren, named_dict = propagate_counts.propagate_counts(
+            taxid_list=taxid_list, 
+            nodes_path=args.nodes, 
+            names_path=args.names,
+            observed_read_counts=observed_read_counts
+            )
+        with open(args.output + ".abundances", "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Taxon", "Assigned_Bases"])
+            for key, value in named_dict.items():
+                writer.writerow([key, value])
 
 if __name__ == "__main__":
     main()
