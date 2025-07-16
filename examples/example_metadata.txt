@@ -1,0 +1,5 @@
+Taxon	TaxID	SRA	FTP	Ref
+Klebsiella pneumoniae 11227-1	1455604	ERR11752369	ftp://ftp.sra.ebi.ac.uk/vol1/fastq/ERR117/069/ERR11752369/ERR11752369	https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/699/345/GCF_000699345.1_11227-1/GCF_000699345.1_11227-1_genomic.fna.gz
+Escherichia fergusonii ATCC 35469	585054	ERR4662002	ftp://ftp.sra.ebi.ac.uk/vol1/fastq/ERR466/002/ERR4662002/ERR4662002	https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/026/225/GCF_000026225.1_ASM2622v1/GCF_000026225.1_ASM2622v1_genomic.fna.gz
+Escherichia coli str. K-12 substr. MG1655	511145	DRR217208	ftp://ftp.sra.ebi.ac.uk/vol1/fastq/DRR217/DRR217208/DRR217208	https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/005/845/GCF_000005845.2_ASM584v2/GCF_000005845.2_ASM584v2_genomic.fna.gz
+Escherichia coli O157:H7 str. Sakai	386585	SRR530851	ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR530/SRR530851/SRR530851	https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/008/865/GCF_000008865.2_ASM886v2/GCF_000008865.2_ASM886v2_genomic.fna.gz
