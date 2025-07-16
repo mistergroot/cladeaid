@@ -12,6 +12,7 @@ from tax_parsing import parse_nodes_dmp
 from tax_parsing import parse_names_dmp
 from tax_parsing import smart_open
 import propagate_counts
+import mash_matrix
 
 def parse_accession2taxid(acc2taxid_file, bamfile):
     print("🔎 Scanning BAM for reference names...")
@@ -321,6 +322,8 @@ def main():
     parser.add_argument("--reference_genome_list", action="store_true", help="Optional - Path to a list of reference genomes " \
     "to use for mash reallocation and adjusting base abundances based on reference genome lengths. Required if "
     "--genome_size_scaling and/or --mash_reallocation is used")
+    parser.add_argument("--threads", type=int, default=4, help="Optional - Number of threads to use for mash " \
+    "distance matrix estimation (default: 4)")
 
     args = parser.parse_args()
 
@@ -353,12 +356,34 @@ def main():
             ])
         writer.writerows(results)
 
-    if args.estimate_abundance:
+    if args.estimate_abundance and not args.mash_reallocation:
         assignments = pd.read_csv(args.output + ".csv")
         assignments['Bases'] = assignments.groupby(['TaxID', 'TaxName'])['TotalBases'].transform('sum')
         assignments = assignments.drop_duplicates(subset=['TaxID', 'TaxName']).reset_index(drop=True)
         observed_read_counts=dict(zip(assignments["TaxID"], assignments["Bases"]))
         taxid_list = assignments["TaxID"].tolist()
+        abundances, parenttochildren, named_dict = propagate_counts.propagate_counts(
+            taxid_list=taxid_list, 
+            nodes_path=args.nodes, 
+            names_path=args.names,
+            observed_read_counts=observed_read_counts
+            )
+        with open(args.output + ".abundances", "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Taxon", "Assigned_Bases"])
+            for key, value in named_dict.items():
+                writer.writerow([key, value])
+
+    if args.estimate_abundance and args.mash_reallocation:
+        assignments = pd.read_csv(args.output + ".csv")
+        assignments['Bases'] = assignments.groupby(['TaxID', 'TaxName'])['TotalBases'].transform('sum')
+        assignments = assignments.drop_duplicates(subset=['TaxID', 'TaxName']).reset_index(drop=True)
+        observed_read_counts=dict(zip(assignments["TaxID"], assignments["Bases"]))
+        taxid_list = assignments["TaxID"].tolist()
+        distmatrix, taxrenamemap_dists = mash_matrix.make_dist_matrix(args.reference_genome_list,
+                                                                      args.output, 
+                                                                      args.threads,
+                                                                      args.acc2taxid)
         abundances, parenttochildren, named_dict = propagate_counts.propagate_counts(
             taxid_list=taxid_list, 
             nodes_path=args.nodes, 
