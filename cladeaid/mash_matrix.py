@@ -1,12 +1,15 @@
+import os
 import subprocess
 import pandas as pd
 from io import StringIO
+from Bio import SeqIO
 import tax_parsing
+import os
 
 def run_mash(ref_list, outprefix = ".", threads = 4):
     if threads < 8:
         jobs = "1"
-        jobthreads = int(threads)
+        jobthreads = str(int(threads))
     else:
         jobs = str(np.floor(threads / 8).astype(int))
         jobthreads = "8"
@@ -22,7 +25,10 @@ def run_mash(ref_list, outprefix = ".", threads = 4):
                                   input=ps.stdout, capture_output=True)
 
 def make_dist_matrix(ref_list, outprefix, threads, acc2tid):
-    run_mash(ref_list, outprefix, threads)
+    if os.path.exists((outprefix + '.dists')):
+        print("Mash distance matrix already exists. Skipping computation.")
+    else:
+        run_mash(ref_list, outprefix, threads)
     df = pd.read_csv((outprefix + '.dists'), sep="\t", header=None,
                      names=["species1", "species2", "distance", "shared", "pvalue"])
 
