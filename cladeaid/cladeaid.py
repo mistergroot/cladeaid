@@ -375,7 +375,9 @@ def main():
             )
         propagated_counts = pd.DataFrame(abundances.items())
         propagated_counts[2] = propagated_counts[1] / propagated_counts[1].sum()
-        propagated_counts.columns = ["Taxon", "Assigned_Bases", "Proportion"]
+        propagated_counts.columns = ["TaxID", "Propagated_Bases", "Propagated_Proportion"]
+        assignments["Proportion"] = assignments["Bases"] / assignments["Bases"].sum()
+        propagated_counts = assignments[["TaxID", "TaxName", "Bases", "Proportion"]].merge(propagated_counts, how = "left", on = "TaxID")
         propagated_counts.to_csv(args.output + ".abundances", index=False)
 
 if __name__ == "__main__":

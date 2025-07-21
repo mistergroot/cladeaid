@@ -17,12 +17,12 @@ def run_mash(ref_list, outprefix = ".", threads = 4):
     ps = subprocess.run(["cat", ref_list], check=True, capture_output=True)
     processNames = subprocess.run(['parallel', '-j', jobs, 'mash', 'sketch', '-p', jobthreads, 
                                    '{}', '-s', '10000'],
-                                  input=ps.stdout, capture_output=True)
+                                  input=ps.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     ps = subprocess.run(["cat", ref_list], check=True, capture_output=True)
     processNames = subprocess.run(['parallel', '-j', jobs, 'mash', 'dist', '-p', jobthreads, 
                                    '{}', ('$( cat ' + ref_list + ')'), '>>', (outprefix + '.dists')],
-                                  input=ps.stdout, capture_output=True)
+                                  input=ps.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 def make_dist_matrix(ref_list, outprefix, threads, acc2tid):
     if os.path.exists((outprefix + '.dists')):
@@ -41,9 +41,9 @@ def make_dist_matrix(ref_list, outprefix, threads, acc2tid):
         with tax_parsing.smart_open(fasta_file) as handle:
             first_record = next(SeqIO.parse(handle, "fasta"))
             ps = subprocess.run(["zgrep", first_record.id, acc2tid], 
-                        check=True, capture_output=True, text = True)
+                        check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
             processNames = subprocess.run(['cut', '-f3'],
-                                          input=ps.stdout, capture_output=True, text = True)
+                                          input=ps.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
             taxid_map_dist[sp] = int(processNames.stdout.replace("\n", ""))
 
     # Initialize distance matrix
