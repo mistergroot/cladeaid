@@ -1,7 +1,8 @@
 import gzip
 
 def smart_open(filepath):
-    return gzip.open(filepath, 'rt') if filepath.endswith('.gz') else open(filepath, 'r')
+   return gzip.open(filepath, 
+                    'rt') if filepath.endswith('.gz') else open(filepath, 'r')
 
 # --- Step 1: Parse taxonomy files ---
 def parse_nodes_dmp(path):

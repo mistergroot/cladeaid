@@ -3,7 +3,7 @@ import subprocess
 import pandas as pd
 from io import StringIO
 from Bio import SeqIO
-import tax_parsing
+from tax_parsing import smart_open
 import os
 
 def run_mash(ref_list, outprefix = ".", threads = 4):
@@ -15,14 +15,18 @@ def run_mash(ref_list, outprefix = ".", threads = 4):
         jobthreads = "8"
 
     ps = subprocess.run(["cat", ref_list], check=True, capture_output=True)
-    processNames = subprocess.run(['parallel', '-j', jobs, 'mash', 'sketch', '-p', jobthreads, 
-                                   '{}', '-s', '10000'],
-                                  input=ps.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    processNames = subprocess.run(['parallel', '-j', jobs, 'mash', 'sketch', 
+                                   '-p', jobthreads, '{}', '-s', '10000'],
+                                  input=ps.stdout, stdout=subprocess.PIPE, 
+                                  stderr=subprocess.PIPE)
 
     ps = subprocess.run(["cat", ref_list], check=True, capture_output=True)
-    processNames = subprocess.run(['parallel', '-j', jobs, 'mash', 'dist', '-p', jobthreads, 
-                                   '{}', ('$( cat ' + ref_list + ')'), '>>', (outprefix + '.dists')],
-                                  input=ps.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    processNames = subprocess.run(['parallel', '-j', jobs, 'mash', 'dist', 
+                                   '-p', jobthreads, '{}', 
+                                   ('$( cat ' + ref_list + ')'), '>>', 
+                                   (outprefix + '.dists')], 
+                                   input=ps.stdout, stdout=subprocess.PIPE, 
+                                   stderr=subprocess.PIPE)
 
 def make_dist_matrix(ref_list, outprefix, threads, acc2tid):
     if os.path.exists((outprefix + '.dists')):
@@ -30,7 +34,8 @@ def make_dist_matrix(ref_list, outprefix, threads, acc2tid):
     else:
         run_mash(ref_list, outprefix, threads)
     df = pd.read_csv((outprefix + '.dists'), sep="\t", header=None,
-                     names=["species1", "species2", "distance", "shared", "pvalue"])
+                     names=["species1", "species2", 
+                            "distance", "shared", "pvalue"])
 
     # Get unique species names
     species = sorted(set(df["species1"]).union(set(df["species2"])))
@@ -38,12 +43,16 @@ def make_dist_matrix(ref_list, outprefix, threads, acc2tid):
     taxid_map_dist = {}
     for sp in species:
         fasta_file = sp
-        with tax_parsing.smart_open(fasta_file) as handle:
+        with smart_open(fasta_file) as handle:
             first_record = next(SeqIO.parse(handle, "fasta"))
             ps = subprocess.run(["zgrep", first_record.id, acc2tid], 
-                        check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+                        check=True, stdout=subprocess.PIPE, 
+                        stderr=subprocess.PIPE, universal_newlines=True)
             processNames = subprocess.run(['cut', '-f3'],
-                                          input=ps.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+                                          input=ps.stdout, 
+                                          stdout=subprocess.PIPE, 
+                                          stderr=subprocess.PIPE, 
+                                          universal_newlines=True)
             taxid_map_dist[sp] = int(processNames.stdout.replace("\n", ""))
 
     # Initialize distance matrix
