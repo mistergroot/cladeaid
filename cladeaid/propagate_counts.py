@@ -1,5 +1,6 @@
 from collections import defaultdict
 import gzip
+import numpy as np
 from tax_parsing import parse_nodes_dmp
 from tax_parsing import parse_names_dmp
 from tax_parsing import smart_open
@@ -102,7 +103,9 @@ def min_pairwise_mash(all_tips, distance_matrix, epsilon=1e-8):
     return penalties
 
 def propagate_counts(
-    taxid_list, nodes_path, names_path,
+    taxid_list, 
+    nodes_path, 
+    names_path,
     observed_read_counts,
     pseudocount=1.0,
     max_iter=100,
