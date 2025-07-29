@@ -2,6 +2,8 @@
 
 Installation
 
-`git clone https://github.com/mistergroot/cladeaid
+```
+    git clone https://github.com/mistergroot/cladeaid
     cd cladeaid
-    conda env create -f environment.yml`
+    conda env create -f environment.yml
+```
