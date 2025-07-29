@@ -7,9 +7,7 @@ from tqdm import tqdm
 import gzip
 import argparse
 import csv
-from tax_parsing import parse_nodes_dmp
-from tax_parsing import parse_names_dmp
-from tax_parsing import smart_open
+from . import tax_parsing
 
 def parse_accession2taxid(acc2taxid_file, bamfile):
     print("🔎 Scanning BAM for reference names...")
@@ -19,7 +17,7 @@ def parse_accession2taxid(acc2taxid_file, bamfile):
     print(f"✅ Found {len(bam_refs):,} reference names in BAM")
 
     ref_to_taxid = {}
-    with smart_open(acc2taxid_file) as f:
+    with tax_parsing.smart_open(acc2taxid_file) as f:
         next(f)
         for line in f:
             parts = line.strip().split('\t')
@@ -66,8 +64,8 @@ def process_bam_streaming(bamfile, acc2taxid_file, nodes_file, names_file,
     start_time = time.time()
 
     print("🔄 Loading taxonomy data...")
-    parent, rank = parse_nodes_dmp(nodes_file)
-    names = parse_names_dmp(names_file)
+    parent, rank = tax_parsing.parse_nodes_dmp(nodes_file)
+    names = tax_parsing.parse_names_dmp(names_file)
     refid_to_taxid = parse_accession2taxid(acc2taxid_file, bamfile)
 
     print(f"📖 Opening BAM file: {bamfile}")

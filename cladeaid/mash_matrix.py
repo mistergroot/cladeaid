@@ -3,7 +3,7 @@ import subprocess
 import pandas as pd
 from io import StringIO
 from Bio import SeqIO
-from tax_parsing import smart_open
+from . import tax_parsing
 import os
 
 def run_mash(ref_list, outfile, 
@@ -49,7 +49,7 @@ def run_mash(ref_list, outfile,
 def count_ref_size(fasta_file):
     total_bases = 0
     try:
-        with smart_open(fasta_file) as handle:
+        with tax_parsing.smart_open(fasta_file) as handle:
             for record in SeqIO.parse(handle, "fasta"):
                 total_bases += len(record.seq)
     except FileNotFoundError:

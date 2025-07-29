@@ -1,15 +1,13 @@
 from collections import defaultdict
 import gzip
 import numpy as np
-from tax_parsing import parse_nodes_dmp
-from tax_parsing import parse_names_dmp
-from tax_parsing import smart_open
+from . import tax_parsing
 
 def get_first_level_children(taxid_list, nodes_path, names_path):
     taxid_set = set(taxid_list)
     children_dict = defaultdict(list)
 
-    parent_map, rank_map = parse_nodes_dmp(nodes_path)
+    parent_map, rank_map = tax_parsing.parse_nodes_dmp(nodes_path)
 
     # Track depth for sorting
     taxid_depth = {}
@@ -142,7 +140,7 @@ def propagate_counts(
     from collections import defaultdict
     import numpy as np
 
-    name_map = parse_names_dmp(names_path)
+    name_map = tax_parsing.parse_names_dmp(names_path)
     parent_to_children = get_first_level_children(taxid_list, nodes_path, 
                                                   names_path)
     ordered_taxa = get_terminal_tip_counts(parent_to_children)
