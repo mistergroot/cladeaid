@@ -23,6 +23,12 @@ def add_arguments(parser):
     )
     parser.add_argument("--csv", required=True, 
                         help="Input CSV from cladeaid.py")
+    parser.add_argument("--acc2taxid", required=True, 
+                        help="Accession2taxid mapping file (can be .gz)")
+    parser.add_argument("--nodes", required=True, 
+                        help="nodes.dmp taxonomy file (can be .gz)")
+    parser.add_argument("--names", required=True, 
+                        help="names.dmp taxonomy file (can be .gz)")
     parser.add_argument("--output", required=True, 
                         help="Output prefix - Assigned reads will be output as "
                              "<output>.csv, and abundances will be written to "

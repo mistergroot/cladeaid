@@ -88,7 +88,7 @@ def make_dist_matrix(ref_list, outfile, acc2tid,
     else:
         for sp in species:
             fasta_file = sp
-            with smart_open(fasta_file) as handle:
+            with tax_parsing.smart_open(fasta_file) as handle:
                 first_record = next(SeqIO.parse(handle, "fasta"))
                 ps = subprocess.run(["zgrep", first_record.id, acc2tid], 
                             check=True, stdout=subprocess.PIPE, 
