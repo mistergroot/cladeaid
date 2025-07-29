@@ -60,9 +60,10 @@ options:
 
 ```
 $cladeaid refinery --help
-usage: cladeaid refinery [-h] --csv CSV --output OUTPUT [--genome_size_scaling] [--output_mappings]
-                         [--mash_reallocation] [--reference_genome_list REFERENCE_GENOME_LIST]
-                         [--pairwise_dists PAIRWISE_DISTS] [--multifasta] [--normalize] [--threads THREADS]
+usage: cladeaid refinery [-h] --csv CSV --acc2taxid ACC2TAXID --nodes NODES --names NAMES --output OUTPUT
+                         [--genome_size_scaling] [--output_mappings] [--mash_reallocation]
+                         [--reference_genome_list REFERENCE_GENOME_LIST] [--pairwise_dists PAIRWISE_DISTS]
+                         [--multifasta] [--normalize] [--threads THREADS]
 
 Estimate abundance using naive or mash distance-aware propagation. Optionally, normalize based on genome size, and
 output bam file for each 'confident' taxon.
@@ -70,6 +71,10 @@ output bam file for each 'confident' taxon.
 options:
   -h, --help            show this help message and exit
   --csv CSV             Input CSV from cladeaid.py
+  --acc2taxid ACC2TAXID
+                        Accession2taxid mapping file (can be .gz)
+  --nodes NODES         nodes.dmp taxonomy file (can be .gz)
+  --names NAMES         names.dmp taxonomy file (can be .gz)
   --output OUTPUT       Output prefix - Assigned reads will be output as <output>.csv, and abundances will be written
                         to <output>.abundances
   --genome_size_scaling
