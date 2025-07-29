@@ -1,5 +1,7 @@
 [![logo](https://raw.githubusercontent.com/mistergroot/cladeaid/refs/heads/main/cladeaid_logo.png)](https://github.com/mistergroot/cladeaid)
 
+## CladeAid: Least common ancestor (LCA) assignment and taxon abundance estimation for mapped reads
+
 Installation
 
 ```
