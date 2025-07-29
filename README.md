@@ -93,6 +93,6 @@ options:
 To run the test files included in `/examples/`, navigate to the examples directory and run the following:
 ```
 cladeaid lca --bam MixA_bowtie_global.sorted.bam --acc2taxid acc2taxid.gz --names names.dmp.gz --nodes nodes.dmp.gz --output test
-cladeaid refinery --csv MixA_bowtie_global.csv --nodes nodes.dmp.gz --names names.dmp.gz --acc2taxid acc2taxid.gz --output test --mash_reallocation --reference_genome_list references.list
+cladeaid refinery --csv test.csv --nodes nodes.dmp.gz --names names.dmp.gz --acc2taxid acc2taxid.gz --output test --mash_reallocation --reference_genome_list references.list
 ```
 This should output the files: `test.csv`, `test.abundances`, and `test.dists`.
