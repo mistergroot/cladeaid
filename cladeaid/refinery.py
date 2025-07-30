@@ -44,6 +44,15 @@ def add_arguments(parser):
     parser.add_argument("--output_all_mappings", action="store_true", 
                         help="Outputs a bam for each taxon (including high " \
                         "level ones at genus or higher).")
+    parser.add_argument("--output_tax_level_mappings", default="none",
+                        help="Outputs a bam with reads collapsed to a " \
+                        "specified taxonomic level. For example, if 'genus' "
+                        "is specified, all reads assigned to that genus, " \
+                        "as well as all species-level reads within that " \
+                        "genus will be collapsed to that genus and output to" \
+                        " <output>_<genus>.bam. Accepted levels are " \
+                        "'kingdom', 'phylum', 'class', 'order', 'family', " \
+                        "'genus', 'species'.")
     parser.add_argument("--output_leaf_mappings", action="store_true", 
                         help="Outputs a bam for each leaf (the most specific" \
                         " taxon in each lineage) that is considered high " \
@@ -72,10 +81,17 @@ def add_arguments(parser):
 
 def run(args):
     assignments = pd.read_csv(args.csv)
-    assignments['Assigned_Bases'] = assignments.groupby(['TaxID', 'TaxName'])['TotalBases'].transform('sum')
-    assignments = assignments.drop_duplicates(subset=['TaxID', 'TaxName']).reset_index(drop=True)
+    assignments['Assigned_Bases'] = (
+        assignments.groupby(['TaxID', 'TaxName'])
+        ['TotalBases'].transform('sum')
+        )
+    assignments = (
+        assignments.drop_duplicates(subset=['TaxID', 'TaxName'])
+        .reset_index(drop=True)
+        )
     
-    observed_read_counts = dict(zip(assignments["TaxID"], assignments["Assigned_Bases"]))
+    observed_read_counts = dict(zip(assignments["TaxID"], 
+                                    assignments["Assigned_Bases"]))
     taxid_list = assignments["TaxID"].tolist()
 
     if args.mash_reallocation:
@@ -98,32 +114,48 @@ def run(args):
         dedup_distmatrix = (grouped_full + grouped_full.T) / 2
         np.fill_diagonal(dedup_distmatrix.values, 0)
                     
-        naive_abundances, penalized_abundances = propagate_counts.propagate_counts(
+        naive_abundances, penalized_abundances = (
+            propagate_counts.propagate_counts(
             taxid_list=taxid_list, 
             nodes_path=args.nodes, 
             names_path=args.names,
             observed_read_counts=observed_read_counts,
             mash_penalty=True,
             distance_matrix=dedup_distmatrix
+            )
         )
     else:
-        naive_abundances, penalized_abundances = propagate_counts.propagate_counts(
+        naive_abundances, penalized_abundances = (
+            propagate_counts.propagate_counts(
             taxid_list=taxid_list, 
             nodes_path=args.nodes, 
             names_path=args.names,
             observed_read_counts=observed_read_counts
+            )
         )
     print(dedup_distmatrix)
-    naive_abundances = pd.DataFrame(naive_abundances.items(), columns=["TaxID", "Naive_Bases"])
-    penalized_abundances = pd.DataFrame(penalized_abundances.items(), columns=["TaxID", "Penalized_Bases"])
+    naive_abundances = pd.DataFrame(naive_abundances.items(), 
+                                    columns=["TaxID","Naive_Bases"])
+    penalized_abundances = pd.DataFrame(penalized_abundances.items(), 
+                                        columns=["TaxID", "Penalized_Bases"])
     
-    propagated_counts = (assignments[["TaxID", "TaxName", "Rank", "Assigned_Bases"]]
-                         .merge(naive_abundances, how="left", on="TaxID")
-                         .merge(penalized_abundances, how="left", on="TaxID"))
+    propagated_counts = (
+        assignments[["TaxID", "TaxName", "Rank", "Assigned_Bases"]]
+        .merge(naive_abundances, how="left", on="TaxID")
+        .merge(penalized_abundances, how="left", on="TaxID"))
     
-    propagated_counts["Assigned_Proportion"] = propagated_counts["Assigned_Bases"] / propagated_counts["Assigned_Bases"].sum()
-    propagated_counts["Naive_Proportion"] = propagated_counts["Naive_Bases"] / propagated_counts["Naive_Bases"].sum()
-    propagated_counts["Penalized_Proportion"] = propagated_counts["Penalized_Bases"] / propagated_counts["Penalized_Bases"].sum()
+    propagated_counts["Assigned_Proportion"] = (
+        propagated_counts["Assigned_Bases"] / 
+        propagated_counts["Assigned_Bases"].sum()
+    )
+    propagated_counts["Naive_Proportion"] = (
+        propagated_counts["Naive_Bases"] / 
+        propagated_counts["Naive_Bases"].sum()
+    )
+    propagated_counts["Penalized_Proportion"] = (
+        propagated_counts["Penalized_Bases"] / 
+        propagated_counts["Penalized_Bases"].sum()
+    )
 
     if args.normalize: 
         reference_sizes = {}
@@ -140,9 +172,14 @@ def run(args):
             for i in range(len(propagated_counts)):
                 if not np.isnan(propagated_counts[prop + "_Bases"][i]):
                     propagated_counts.at[i, prop + "_Proportion"] = (
-                        propagated_counts[prop + "_Bases"][i] / reference_sizes.get(propagated_counts["TaxID"][i], np.nan)
+                        propagated_counts[prop + "_Bases"][i] / 
+                        reference_sizes.get(propagated_counts["TaxID"][i], 
+                                            np.nan)
                     )
-            propagated_counts[prop + "_Proportion"] = propagated_counts[prop + "_Proportion"] / propagated_counts[prop + "_Proportion"].sum()
+            propagated_counts[prop + "_Proportion"] = (
+                propagated_counts[prop + "_Proportion"] / 
+                propagated_counts[prop + "_Proportion"].sum()
+            )
     
     propagated_counts.to_csv(args.output + ".abundances", index=False)
     

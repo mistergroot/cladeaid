@@ -1,11 +1,22 @@
 import pysam
 import pandas as pd
 from collections import defaultdict
+from collections.abc import Iterable
 
 def split_bam_by_taxid(input_bam_path, outprefix, read_taxid_df, taxa):
     # Open input BAM
     df = pd.read_csv(read_taxid_df)
-    df = df[df["TaxName"].isin(taxa)].reset_index(drop=True)
+    if type(taxa) is list:
+        df = df[df["TaxName"].isin(taxa)].reset_index(drop=True)
+    elif type(taxa) is str:
+        df = df[df["TaxName"] == taxa].reset_index(drop=True)
+    elif type(taxa) is dict:
+        taxnames = (
+            [x for k, v in taxa.items() for x in 
+             ([k] + (list(v) if isinstance(v, Iterable) and not 
+                     isinstance(v, (str, bytes)) else [v]))]
+        )
+        df = df[df["TaxName"].isin(taxnames)].reset_index(drop=True)
     df = df.set_index("ReadName")
     infile = pysam.AlignmentFile(input_bam_path, "rb")
 
