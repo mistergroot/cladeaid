@@ -12,6 +12,7 @@ from . import tax_parsing
 import os
 from . import bam_processor
 from . import propagate_counts
+from . import bam_splitter
 from . import mash_matrix
 from Bio import SeqIO
 
@@ -30,25 +31,44 @@ def add_arguments(parser):
     parser.add_argument("--names", required=True, 
                         help="names.dmp taxonomy file (can be .gz)")
     parser.add_argument("--output", required=True, 
-                        help="Output prefix - Assigned reads will be output as "
-                             "<output>.csv, and abundances will be written to "
-                             "<output>.abundances")
+                        help="Output prefix - Assigned reads will be output " \
+                        "as <output>.csv, and abundances will be written " \
+                        "to <output>.abundances")
     parser.add_argument("--genome_size_scaling", action="store_true", 
-                        help="Adjust base abundances based on reference genome lengths")
-    parser.add_argument("--output_mappings", action="store_true", 
-                        help="Outputs a bam for each species with confident mappings")
+                        help="Adjust base abundances based on reference " \
+                        "genome lengths")
+    parser.add_argument("--bam",
+                        help="Input bam file. Only required if "
+                        "--output_all_mappings or "
+                        "--output_confident_mappings are specified.")
+    parser.add_argument("--output_all_mappings", action="store_true", 
+                        help="Outputs a bam for each taxon (including high " \
+                        "level ones at genus or higher).")
+    parser.add_argument("--output_leaf_mappings", action="store_true", 
+                        help="Outputs a bam for each leaf (the most specific" \
+                        " taxon in each lineage) that is considered high " \
+                        "confidence (i.e. >0.05 percent abundance. If "
+                        "--mash_reallocation was used, confident also " \
+                        "refers to species that have no other close " \
+                        "relatives with <0.05 mash distance)")
     parser.add_argument("--mash_reallocation", action="store_true", 
-                        help="Use mash to calculate distances and reallocate bases to more specific taxa")
+                        help="Use mash to calculate distances and reallocate" \
+                        " bases to more specific taxa")
     parser.add_argument("--reference_genome_list", default="references.list", 
-                        help="Path to list of reference genomes for mash reallocation and genome size adjustment")
+                        help="Path to list of reference genomes for mash " \
+                        "reallocation and genome size adjustment")
     parser.add_argument("--pairwise_dists", default="all.dists",
-                        help="Path to pairwise distance file between genomes for mash reallocation")
+                        help="Path to pairwise distance file between genomes" \
+                        " for mash reallocation")
     parser.add_argument("--multifasta", default=False, action="store_true", 
-                        help="Flag if BAMs were mapped against a multi-organism fasta reference")
+                        help="Flag if BAMs were mapped against a " \
+                        "multi-organism fasta reference")
     parser.add_argument("--normalize", action="store_true",
-                        help="Normalize bases assigned to taxa based on genome sizes")
+                        help="Normalize bases assigned to taxa based on " \
+                        "genome sizes")
     parser.add_argument("--threads", type=int, default=4, 
-                        help="Number of threads for mash distance matrix estimation (default: 4)")
+                        help="Number of threads for mash distance matrix " \
+                        "estimation (default: 4)")
 
 def run(args):
     assignments = pd.read_csv(args.csv)
@@ -73,7 +93,7 @@ def run(args):
         distmatrix = distmatrix.rename(index=taxrename, columns=taxrename)
 
         grouped_rows = distmatrix.groupby(distmatrix.index).mean()
-        grouped_full = grouped_rows.T.groupby(distmatrix.columns, axis=0).mean().T
+        grouped_full = grouped_rows.T.groupby(distmatrix.columns).mean().T
 
         dedup_distmatrix = (grouped_full + grouped_full.T) / 2
         np.fill_diagonal(dedup_distmatrix.values, 0)
@@ -93,7 +113,7 @@ def run(args):
             names_path=args.names,
             observed_read_counts=observed_read_counts
         )
-    
+    print(dedup_distmatrix)
     naive_abundances = pd.DataFrame(naive_abundances.items(), columns=["TaxID", "Naive_Bases"])
     penalized_abundances = pd.DataFrame(penalized_abundances.items(), columns=["TaxID", "Penalized_Bases"])
     
@@ -125,6 +145,33 @@ def run(args):
             propagated_counts[prop + "_Proportion"] = propagated_counts[prop + "_Proportion"] / propagated_counts[prop + "_Proportion"].sum()
     
     propagated_counts.to_csv(args.output + ".abundances", index=False)
+    
+    if args.output_all_mappings:
+        taxa = propagated_counts.TaxName.unique().tolist()
+        bam_splitter.split_bam_by_taxid(args.bam, 
+                                        args.output, 
+                                        args.csv,
+                                        taxa)
+    if args.output_leaf_mappings:
+        taxa = (propagated_counts.TaxName
+                [propagated_counts.Naive_Proportion.notna()].unique().tolist())
+        if args.mash_reallocation:
+            taxid = (propagated_counts.TaxID
+                [propagated_counts.Naive_Proportion.notna()]
+                .unique().tolist())
+            subset_matrix = dedup_distmatrix.loc[taxid, taxid]
+            mask = (subset_matrix >= 0.05) | (subset_matrix == 0)
+            valid_species = mask.all(axis=1)
+            conf_matrix = subset_matrix.loc[valid_species.index[valid_species], 
+                                            valid_species.index[valid_species]]
+            taxa = (propagated_counts.TaxName
+                [propagated_counts.Naive_Proportion.notna()]
+                [propagated_counts.TaxID.isin(conf_matrix.columns.tolist())]
+                .unique().tolist())
+        bam_splitter.split_bam_by_taxid(args.bam, 
+                                        args.output, 
+                                        args.csv,
+                                        taxa)
 
 def main():
     parser = argparse.ArgumentParser()
