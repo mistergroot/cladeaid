@@ -8,6 +8,7 @@ import os
 
 def run_mash(ref_list, outfile, 
              multifasta=False, threads=4):
+    print("Running Mash sketch and distance calculations...")
     if threads < 8:
         jobs = "1"
         jobthreads = str(int(threads))
@@ -45,6 +46,7 @@ def run_mash(ref_list, outfile,
                                    outfile], 
                                    input=ps.stdout, stdout=subprocess.PIPE, 
                                    stderr=subprocess.PIPE)
+    print("Mash sketch and distance calculations completed.")
     
 def count_ref_size(fasta_file):
     total_bases = 0

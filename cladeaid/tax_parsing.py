@@ -29,3 +29,24 @@ def parse_names_dmp(path):
             if class_txt == "scientific name":
                 name_map[taxid] = name_txt
     return name_map
+
+def load_taxonomy(nodes_fp, names_fp):
+    parent_map, taxid_to_rank = parse_nodes_dmp(nodes_fp)
+    taxid_to_name = parse_names_dmp(names_fp)
+    return taxid_to_name, taxid_to_rank, parent_map
+
+def get_ancestor_at_level(taxid, target_level, parent_map, 
+                          taxid_to_rank, taxid_to_name=None):
+    current = taxid
+    while current in parent_map:
+        rank = taxid_to_rank.get(current, "")
+        if rank == target_level:
+            if taxid_to_name:
+                return taxid_to_name.get(current, f"taxid:{current}")
+            else:
+                return current
+        if parent_map[current] == current:
+            # reached root
+            break
+        current = parent_map[current]
+    return None

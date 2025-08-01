@@ -14,6 +14,7 @@ from . import bam_processor
 from . import propagate_counts
 from . import bam_splitter
 from . import mash_matrix
+from . import tax_parsing
 from Bio import SeqIO
 
 def add_arguments(parser):
@@ -95,6 +96,7 @@ def run(args):
     taxid_list = assignments["TaxID"].tolist()
 
     if args.mash_reallocation:
+        print("Beginning distance matrix calculation and read propagation...")
         if os.path.exists(args.pairwise_dists):
             distmatrix, taxrename = mash_matrix.make_dist_matrix(
                 args.reference_genome_list, args.pairwise_dists, 
@@ -113,7 +115,7 @@ def run(args):
 
         dedup_distmatrix = (grouped_full + grouped_full.T) / 2
         np.fill_diagonal(dedup_distmatrix.values, 0)
-                    
+        
         naive_abundances, penalized_abundances = (
             propagate_counts.propagate_counts(
             taxid_list=taxid_list, 
@@ -124,7 +126,10 @@ def run(args):
             distance_matrix=dedup_distmatrix
             )
         )
+        print("Naive abundances and penalized abundances calculated.")
+
     else:
+        print("Naively propagating counts down the tree")
         naive_abundances, penalized_abundances = (
             propagate_counts.propagate_counts(
             taxid_list=taxid_list, 
@@ -133,7 +138,8 @@ def run(args):
             observed_read_counts=observed_read_counts
             )
         )
-    print(dedup_distmatrix)
+        print("Naive abundances calculated.")
+    
     naive_abundances = pd.DataFrame(naive_abundances.items(), 
                                     columns=["TaxID","Naive_Bases"])
     penalized_abundances = pd.DataFrame(penalized_abundances.items(), 
@@ -158,6 +164,7 @@ def run(args):
     )
 
     if args.normalize: 
+        print("Normalizing abundances based on genome sizes.")
         reference_sizes = {}
         refs = open(args.reference_genome_list).read().splitlines()
         for ref in refs:
@@ -180,6 +187,7 @@ def run(args):
                 propagated_counts[prop + "_Proportion"] / 
                 propagated_counts[prop + "_Proportion"].sum()
             )
+        print("Normalized abundances calculated based on genome sizes.")
     
     propagated_counts.to_csv(args.output + ".abundances", index=False)
     
@@ -189,6 +197,8 @@ def run(args):
                                         args.output, 
                                         args.csv,
                                         taxa)
+        print("BAM files split by taxon.")
+
     if args.output_leaf_mappings:
         taxa = (propagated_counts.TaxName
                 [propagated_counts.Naive_Proportion.notna()].unique().tolist())
@@ -209,6 +219,26 @@ def run(args):
                                         args.output, 
                                         args.csv,
                                         taxa)
+        print("BAM files for all confident leaves")
+        
+    if args.output_tax_level_mappings != "none":
+        taxid_to_name, taxid_to_rank, parent_map = (
+            tax_parsing.load_taxonomy(args.nodes, args.names)
+        )
+        taxa = propagated_counts.TaxID.unique().tolist()
+        user_specified_level_map = {}
+        for tax in taxa:
+            user_level = tax_parsing.get_ancestor_at_level(tax, 
+                                               args.output_tax_level_mappings, 
+                                               parent_map, taxid_to_rank, 
+                                               taxid_to_name=taxid_to_name)
+            if user_level is not None:
+                user_specified_level_map[tax] = user_level
+        bam_splitter.split_bam_by_taxid(args.bam, 
+                                        args.output, 
+                                        args.csv,
+                                        user_specified_level_map)
+        print(f"BAM files output at the {args.output_tax_level_mappings} level.")
 
 def main():
     parser = argparse.ArgumentParser()
