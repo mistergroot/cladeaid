@@ -1,6 +1,7 @@
 import os
 import subprocess
 import pandas as pd
+import numpy as np
 from io import StringIO
 from Bio import SeqIO
 from . import tax_parsing
@@ -77,30 +78,58 @@ def make_dist_matrix(ref_list, outfile, acc2tid,
 
     taxid_map_dist = {}
     if multifasta:
-        for sp in species:
-            ps = subprocess.run(["zgrep", sp, acc2tid], 
-                        check=True, stdout=subprocess.PIPE, 
-                        stderr=subprocess.PIPE, universal_newlines=True)
-            processNames = subprocess.run(['cut', '-f3'],
-                                        input=ps.stdout, 
-                                        stdout=subprocess.PIPE, 
-                                        stderr=subprocess.PIPE, 
-                                        universal_newlines=True)
-            taxid_map_dist[sp] = int(processNames.stdout.replace("\n", ""))
+        with open(outfile + ".tmp", 'w') as file:
+            for item in species:
+                file.write(f"{item}\n")
+
+        ps = subprocess.run(["zgrep", "-f", (outfile + ".tmp"), acc2tid], 
+                                check=True, stdout=subprocess.PIPE, 
+                                stderr=subprocess.PIPE, universal_newlines=True)
+        processNames = subprocess.run(['cut', '-f2,3'],
+                                    input=ps.stdout, 
+                                    stdout=subprocess.PIPE, 
+                                    stderr=subprocess.PIPE, 
+                                    universal_newlines=True)
+        taxid_map_dist = {
+            key: int(value)
+            for line in processNames.stdout.strip().split('\n') if line
+            for key, value in [line.split('\t')]
+        }
+
     else:
+        sp_to_header = {}
         for sp in species:
-            fasta_file = sp
-            with tax_parsing.smart_open(fasta_file) as handle:
+            with tax_parsing.smart_open(sp) as handle:
                 first_record = next(SeqIO.parse(handle, "fasta"))
-                ps = subprocess.run(["zgrep", first_record.id, acc2tid], 
-                            check=True, stdout=subprocess.PIPE, 
+                sp_to_header[sp] = first_record.id
+
+        with open(outfile + ".tmp", 'w') as file:
+            for header in sp_to_header.values():
+                file.write(f"{header}\n")
+
+        ps = subprocess.run(["zgrep", "-f", (outfile + ".tmp"), acc2tid],
+                            check=True, stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE, universal_newlines=True)
-                processNames = subprocess.run(['cut', '-f3'],
-                                            input=ps.stdout, 
-                                            stdout=subprocess.PIPE, 
-                                            stderr=subprocess.PIPE, 
-                                            universal_newlines=True)
-                taxid_map_dist[sp] = int(processNames.stdout.replace("\n", ""))
+
+        processNames = subprocess.run(['cut', '-f2,3'],
+                                    input=ps.stdout,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE,
+                                    universal_newlines=True)
+
+        # Map header → taxid
+        header_to_taxid = {
+            key: int(value)
+            for line in processNames.stdout.strip().split('\n') if line
+            for key, value in [line.split('\t')]
+        }
+
+        # Now map sp → taxid using the sp_to_header mapping
+        taxid_map_dist = {
+            sp: header_to_taxid[header]
+            for sp, header in sp_to_header.items()
+            if header in header_to_taxid
+        }
 
     # Initialize distance matrix
     dist_matrix = pd.DataFrame(0.0, index=species, columns=species)

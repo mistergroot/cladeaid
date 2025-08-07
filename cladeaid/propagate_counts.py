@@ -140,9 +140,18 @@ def propagate_counts(
     from collections import defaultdict
     import numpy as np
 
+    print("Propagating reads from higher taxonomic levels down to the " \
+    "leaf level.")
+
+    print("Loading names.dmp")
+
     name_map = tax_parsing.parse_names_dmp(names_path)
+
+    print("Generating maps of first-level children")
     parent_to_children = get_first_level_children(taxid_list, nodes_path, 
                                                   names_path)
+    
+    print("Getting terminal tip counts to order children")
     ordered_taxa = get_terminal_tip_counts(parent_to_children)
     ambiguous_nodes = [t for t in ordered_taxa if t in observed_read_counts]
 
@@ -163,6 +172,7 @@ def propagate_counts(
     for taxid in taxid_set:
         initial_counts[taxid] = float(observed_read_counts.get(taxid, 0.0))
 
+    print("Running count propagation")
     def run_em(counts, use_mash=False):
         current_counts = counts.copy()
         for _ in range(max_iter):

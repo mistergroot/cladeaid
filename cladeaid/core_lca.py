@@ -65,16 +65,16 @@ def run(args):
         if args.extract_read_attributes:
             writer.writerow([
                 "ReadName", "TaxID", "TaxName", "Rank", "TotalBases", 
-                "BestIdentity", "ReadPairConcordance", "R1_Length", 
-                "R1_Matches", "R1_Insertions", "R1_Deletions", "R1_Softclips",
-                "R1_Hardclips", "R1_AvgQual", "R2_Length", "R2_Matches", 
-                "R2_Insertions", "R2_Deletions", "R2_Softclips", 
+                "BestIdentity", "ReadPairConcordance", "Contig", 
+                "R1_lowq", "R1_Length", "R1_Matches", "R1_Insertions", "R1_Deletions", 
+                "R1_Softclips", "R1_Hardclips", "R1_AvgQual", "R2_lowq", "R2_Length", 
+                "R2_Matches", "R2_Insertions", "R2_Deletions", "R2_Softclips", 
                 "R2_Hardclips", "R2_AvgQual"
             ])
         else:
             writer.writerow([
                 "ReadName", "TaxID", "TaxName", "Rank", "TotalBases", 
-                "BestIdentity", "ReadPairConcordance"
+                "BestIdentity", "ReadPairConcordance", "Contig"
             ])
         writer.writerows(results)
 

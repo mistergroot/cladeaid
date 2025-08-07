@@ -2,6 +2,7 @@ import pysam
 import pandas as pd
 from collections import defaultdict
 from collections.abc import Iterable
+import subprocess
 from . import tax_parsing
 
 def split_bam_by_taxid(input_bam_path, outprefix, read_taxid_df, taxa):
@@ -37,6 +38,9 @@ def split_bam_by_taxid(input_bam_path, outprefix, read_taxid_df, taxa):
                 outpath = f"{outprefix}_{taxid}.bam"
                 bam_writers[taxid] = pysam.AlignmentFile(outpath, "wb",
                                                         template=infile)
+            
+            if read.reference_name not in df.loc[read_name, "Contig"]:
+                continue
 
             # Write to corresponding BAM file
             bam_writers[taxid].write(read)
@@ -56,6 +60,8 @@ def split_bam_by_taxid(input_bam_path, outprefix, read_taxid_df, taxa):
                 bam_writers[taxid] = pysam.AlignmentFile(outpath, "wb",
                                                         template=infile)
 
+            if read.reference_name not in df.loc[read_name, "Contig"]:
+                continue
             # Write to corresponding BAM file
             bam_writers[taxid].write(read)
 
@@ -64,3 +70,22 @@ def split_bam_by_taxid(input_bam_path, outprefix, read_taxid_df, taxa):
         writer.close()
 
     infile.close()
+
+    if type(taxa) is list:
+        outputs_to_sort = list(set(taxa))
+    elif type(taxa) is str:
+        outputs_to_sort = [taxa]
+    elif type(taxa) is dict:
+        outputs_to_sort = list(set(list(taxa.values())))
+    
+    for tax in outputs_to_sort:
+        input_bam_file = f"{outprefix}_{tax.replace(" ", "_")}.bam"
+        output_sorted_bam_file = f"{outprefix}_{tax.replace(" ", "_")}.sorted.bam"
+
+        # Sort the BAM file by genomic position
+        pysam.sort("-o", output_sorted_bam_file, input_bam_file)
+
+        # Optionally, create an index for the sorted BAM file
+        pysam.index(output_sorted_bam_file)
+
+        subprocess.run(["rm", input_bam_file])

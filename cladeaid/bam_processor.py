@@ -182,12 +182,6 @@ def process_bam_streaming(bamfile, acc2taxid_file, nodes_file, names_file,
     return output
 
 # --- Step 4: LCA read assignment ---
-# (rest of code above unchanged)
-
-# (rest of code above unchanged)
-
-# (rest of code above unchanged)
-
 def assign_lca_from_pair(reads, refid_to_taxid, parent, rank, names, 
                          min_identity=0.0, extract_read_attributes=False):
     from collections import defaultdict
@@ -214,10 +208,7 @@ def assign_lca_from_pair(reads, refid_to_taxid, parent, rank, names,
 
         key = "R1" if read.is_read1 else "R2" if read.is_read2 else "U"
 
-        if extract_read_attributes:
-            entry = (taxid, score, query_len, read)
-        else:
-            entry = (taxid, score, query_len)
+        entry = (taxid, score, query_len, read)
 
         if key not in best_scores or score > best_scores[key]:
             best_by_read[key] = [entry]
@@ -245,30 +236,33 @@ def assign_lca_from_pair(reads, refid_to_taxid, parent, rank, names,
                 lca_taxid = find_lca(lca_taxid, t, parent)
             collapsed_taxids[key] = lca_taxid
 
-        if extract_read_attributes:
-            read = hits[0][3]
-            nm = read.get_tag("NM") if read.has_tag("NM") else 0
-            insertions = sum(length for op, length in 
-                            (read.cigartuples or []) if op == 1)
-            deletions = sum(length for op, length in 
-                            (read.cigartuples or []) if op == 2)
-            mismatches = max(0, nm - insertions - deletions)
+        read = hits[0][3]
+        nm = read.get_tag("NM") if read.has_tag("NM") else 0
+        insertions = sum(length for op, length in 
+                        (read.cigartuples or []) if op == 1)
+        deletions = sum(length for op, length in 
+                        (read.cigartuples or []) if op == 2)
+        mismatches = max(0, nm - insertions - deletions)
+        qual_scores = read.query_qualities  # List of integers
+        lowq_count = sum(q < 10 for q in qual_scores)
 
-            metrics = {
-                "length": read.query_length or 0,
-                "mismatches": mismatches,
-                "insertions": insertions,
-                "deletions": deletions,
-                "softclips": sum(length for op, length in 
-                                 (read.cigartuples or []) if op == 4),
-                "hardclips": sum(length for op, length in 
-                                 (read.cigartuples or []) if op == 5),
-                "avg_qual": round(sum(read.query_qualities or []) / 
-                                  len(read.query_qualities or [1]), 2)
-            }
+        metrics = {
+            "contig": read.reference_name,
+            "lowq": lowq_count,
+            "length": read.query_length or 0,
+            "mismatches": mismatches,
+            "insertions": insertions,
+            "deletions": deletions,
+            "softclips": sum(length for op, length in 
+                                (read.cigartuples or []) if op == 4),
+            "hardclips": sum(length for op, length in 
+                                (read.cigartuples or []) if op == 5),
+            "avg_qual": round(sum(read.query_qualities or []) / 
+                                len(read.query_qualities or [1]), 2)
+        }
 
-            # For unpaired reads, store in R1 metrics
-            read_metrics["R1" if key in ("R1", "U") else "R2"] = metrics
+        # For unpaired reads, store in R1 metrics
+        read_metrics["R1" if key in ("R1", "U") else "R2"] = metrics
 
     taxid_r1 = collapsed_taxids.get("R1")
     taxid_r2 = collapsed_taxids.get("R2")
@@ -279,29 +273,38 @@ def assign_lca_from_pair(reads, refid_to_taxid, parent, rank, names,
         if taxid_r1 == taxid_r2:
             final_taxid = taxid_r1
             concordance = "same"
+            contig = read_metrics.get("R1", {}).get("contig", 0)
         elif taxid_r1 in lineage(taxid_r2, parent):
             final_taxid = taxid_r1
             concordance = "R2 less specific"
+            contig = read_metrics.get("R1", {}).get("contig", 0)
         elif taxid_r2 in lineage(taxid_r1, parent):
             final_taxid = taxid_r2
             concordance = "R1 less specific"
+            contig = read_metrics.get("R2", {}).get("contig", 0)
         else:
             final_taxid = find_lca(taxid_r1, taxid_r2, parent)
             concordance = "discordant"
+            contig1 = read_metrics.get("R1", {}).get("contig", 0)
+            contig2 = read_metrics.get("R2", {}).get("contig", 0)
+            contig = contig1 + "/" + contig2
     else:
         final_taxid = taxid_r1 or taxid_r2 or taxid_u or 1
         concordance = "unpaired"
+        contig = (read_metrics.get("R1", {}).get("contig", 0) or 
+                  read_metrics.get("R2", {}).get("contig", 0))
 
     tax_name = names.get(final_taxid, "Unknown")
     tax_rank = rank.get(final_taxid, "NA")
 
     row = [reads[0].query_name, final_taxid, tax_name, tax_rank, total_bases, 
-           round(best_identity, 4), concordance]
+           round(best_identity, 4), concordance, contig]
 
     if extract_read_attributes:
         def unpack(k):
             m = read_metrics.get(k, {})
             return [
+                m.get("lowq", 0),
                 m.get("length", 0), m.get("mismatches", 0), 
                 m.get("insertions", 0), m.get("deletions", 0),
                 m.get("softclips", 0), m.get("hardclips", 0), 

@@ -108,6 +108,8 @@ def run(args):
                 args.acc2taxid, multifasta=args.multifasta, 
                 threads=args.threads)
             
+        print("Processing distance matrices")
+        
         distmatrix = distmatrix.rename(index=taxrename, columns=taxrename)
 
         grouped_rows = distmatrix.groupby(distmatrix.index).mean()
@@ -234,6 +236,7 @@ def run(args):
                                                taxid_to_name=taxid_to_name)
             if user_level is not None:
                 user_specified_level_map[tax] = user_level
+        print("user_specified_level_map", user_specified_level_map)
         bam_splitter.split_bam_by_taxid(args.bam, 
                                         args.output, 
                                         args.csv,
