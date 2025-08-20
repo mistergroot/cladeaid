@@ -8,6 +8,8 @@ import gzip
 import argparse
 import csv
 from . import tax_parsing
+import subprocess
+import io
 
 def parse_accession2taxid(acc2taxid_file, bamfile):
     print("🔎 Scanning BAM for reference names...")
@@ -16,17 +18,28 @@ def parse_accession2taxid(acc2taxid_file, bamfile):
     samfile.close()
     print(f"✅ Found {len(bam_refs):,} reference names in BAM")
 
-    ref_to_taxid = {}
-    with tax_parsing.smart_open(acc2taxid_file) as f:
-        next(f)
-        for line in f:
-            parts = line.strip().split('\t')
-            if len(parts) < 4:
-                continue
-            acc, taxid = parts[1], parts[2]
-            if acc in bam_refs:
-                ref_to_taxid[acc] = int(taxid)
+    # Prepare BAM references as a newline-separated string
+    bam_refs_str = "\n".join(bam_refs).encode('utf-8')
 
+    # Use zgrep -F -f - (patterns from stdin) to extract only matching lines
+    print("🔎 Filtering accession2taxid file with zgrep...")
+    cmd = ["zgrep", "-F", "-f", "-", acc2taxid_file]
+    process = subprocess.run(cmd, input=bam_refs_str,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+
+    if process.returncode not in (0, 1):  # 1 means no matches
+        raise RuntimeError(f"zgrep failed: {process.stderr.decode()}")
+
+    ref_to_taxid = {}
+    for line in io.BytesIO(process.stdout):
+        parts = line.decode().strip().split('\t')
+        if len(parts) < 4:
+            continue
+        acc, taxid = parts[1], parts[2]
+        ref_to_taxid[acc] = int(taxid)
+
+    # Map BAM reference IDs to taxids
     refid_to_taxid = {}
     samfile = pysam.AlignmentFile(bamfile, "rb")
     for i, name in enumerate(samfile.references):
