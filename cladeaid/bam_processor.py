@@ -8,6 +8,7 @@ import gzip
 import argparse
 import csv
 from . import tax_parsing
+import subprocess
 
 def parse_accession2taxid(acc2taxid_file, bamfile):
     print("🔎 Scanning BAM for reference names...")
